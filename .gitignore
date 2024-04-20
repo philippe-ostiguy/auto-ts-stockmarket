@@ -116,14 +116,11 @@ resources/input/backup/reddit.csv
 
 # Custom files to ignore
 resources/input/raw/reddit.csv
-archives/models/*
 lightning_logs/*
 models/*
 !models/best_model
 resources/input/*
 /resources/input/
-super-mario-bros.mp3
 /app/trainer/.idea/
 .idea/
-/archives/
-/colab/
+
