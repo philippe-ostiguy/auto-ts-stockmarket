@@ -9,7 +9,7 @@ from app.shared.config.constants import (
     TRANSFORMATION_PATH,
     PATHS_TO_CREATE
 )
-
+from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping
 
 from datetime import datetime, timedelta
 from copy import deepcopy
@@ -36,6 +36,12 @@ warning_handler.setFormatter(warning_formatter)
 
 logging.getLogger().addHandler(warning_handler)
 
+
+PYTORCH_CALLBACKS = {
+    'EarlyStopping' : EarlyStopping,
+    'ModelCheckPoint' : ModelCheckpoint
+
+}
 
 class ConfigManager:
     def __init__(self, file, clean_data_for_model : Optional = False) -> None:
@@ -280,24 +286,6 @@ class ConfigManager:
                 list):
             likelihood = common_config["likelihood"]
 
-        if "loss" in model_args and ('Quantile' in model_args["loss"]):
-            if likelihood:
-                model_args['loss'] = LOSS[model_args['loss']](
-                    quantiles=likelihood)
-
-            else:
-                model_args['loss'] = LOSS[model_args['loss']]()
-
-            if "confidence_level" in common_config and common_config[
-                'confidence_level'] not in likelihood:
-                raise ValueError(
-                    f'Confidence level {common_config["confidence_level"]} must be a value '
-                    f'in likelihood {likelihood}')
-
-        elif "loss" in model_args:
-            model_args['loss'] = LOSS[model_args['loss']]()
-
-        return model_args
 
     def _extract_config_values(self, keys : str, config : dict) -> dict:
         return {k: config[k] for k in keys if k in config}

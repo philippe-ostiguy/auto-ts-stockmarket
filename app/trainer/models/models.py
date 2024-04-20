@@ -18,8 +18,6 @@ from app.shared.config.config_utils import ConfigManager
 from app.shared.utils import clear_directory_content, read_json, save_json, read_csv_to_pd_formatted
 from app.shared.config.constants import DATASETS
 from app.trainer.models.common import get_risk_rewards_metrics
-from app.trainer.config.config_utils import ModelValueRetriver
-from app.trainer.models.model_customizer import CustomTemporalFusionTransformer
 from app.shared.utils import play_music
 import pytz
 import datetime
@@ -33,10 +31,6 @@ from abc import ABC
 import logging
 import torch
 
-
-CUSTOM_MODEL = {
-    "TemporalFusionTransformer": CustomTemporalFusionTransformer,
-}
 
 
 class BaseModelBuilder(ABC):

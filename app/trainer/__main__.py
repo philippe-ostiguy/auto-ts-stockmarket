@@ -35,16 +35,15 @@ import torch
 from pytorch_lightning.callbacks import ModelCheckpoint
 
 
-
-from app.trainer.models.model_customizer import CustomNBEATS, CustomAutoTFT
+from app.trainer.models.model_customizer import CustomAutoTFT
 import pandas as pd
 import matplotlib.pyplot as plt
 from neuralforecast import NeuralForecast
 from neuralforecast.models import TFT, NHITS
+from neuralforecast.auto import AutoTFT
 from neuralforecast.losses.pytorch import HuberMQLoss
 from neuralforecast.utils import AirPassengersDF
 from ray import tune
-
 
 
 Y_df = AirPassengersDF
@@ -73,7 +72,7 @@ default_config = {
 
 
 num_samples=5
-models = [CustomAutoTFT(config =default_config,
+models = [AutoTFT(config =default_config,
                     loss=HuberMQLoss(quantiles=[0.05,.4,0.5,.6,0.95]),
                     h = 1, num_samples=3)]
 
