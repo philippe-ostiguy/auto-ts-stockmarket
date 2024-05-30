@@ -49,11 +49,12 @@ PATHS_TO_CREATE = [
 ]
 
 # Data attributes
-RAW_ATTRIBUTES = ["date", "value"]
+RAW_ATTRIBUTES = ["ds", "value", "unique_id"]
+STATIC_COL = ["ds","unique_id"]
 MODEL_PHASES = ["train", "predict"]
 
 # Data engineering
 ENGINEERED_DATA_TO_REMOVE = 2
 
 
-DATASETS = ['train', 'predict', 'test']
+DATASETS = ['train','test']

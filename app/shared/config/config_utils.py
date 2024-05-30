@@ -9,16 +9,16 @@ from app.shared.config.constants import (
     TRANSFORMATION_PATH,
     PATHS_TO_CREATE
 )
-from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping
+from .model_config import (
+    PYTORCH_CALLBACKS,
+    LOSS
+)
 
 from datetime import datetime, timedelta
 from copy import deepcopy
 from typing import List, Dict, Text, Any, Optional, Tuple, Union
 import os
 import yaml
-
-import torch
-torch.manual_seed(42)
 import logging
 
 logging.basicConfig(
@@ -37,12 +37,6 @@ warning_handler.setFormatter(warning_formatter)
 logging.getLogger().addHandler(warning_handler)
 
 
-PYTORCH_CALLBACKS = {
-    'EarlyStopping' : EarlyStopping,
-    'ModelCheckPoint' : ModelCheckpoint
-
-}
-
 class ConfigManager:
     def __init__(self, file, clean_data_for_model : Optional = False) -> None:
         self._config = self._load_config(file)
@@ -60,7 +54,6 @@ class ConfigManager:
             self.running_app = 'trainer'
         if self.running_app != 'trader':
 
-            self._validate_model_metrics()
             if self._config["common"]['engineering'] and clean_data_for_model:
                 clear_directory_content(ENGINEERED_PATH)
                 clear_directory_content(MODEL_DATA_PATH)
@@ -124,8 +117,9 @@ class ConfigManager:
             sub_dict["data"] = list(set(sub_dict["data"]))
 
     def _assign_cv_values(self):
-        if not self._config['common']['cross_validation']['is_running'] :
-            self._config['common']['cross_validation']['sliding_windows'] = 1
+        self._config['common']['cross_validation']= {}
+        self._config['common']['cross_validation']['sliding_windows']= 1
+
 
     def _load_data_dynamically(self, source: str, subname : Optional[str] ='') -> List[str]:
         file_path = f"resources/configs/dynamic_ticker/{source}{subname}_daily.txt"
@@ -146,58 +140,28 @@ class ConfigManager:
 
     def get_callbacks(self,
                       model,
-                      hyperparameters_phase : Optional[str] = "hyperparameters",
-                      extra_dirpath : Optional[str] = '',
-                      current_window: Optional[int] = None):
-        pl_trainer_kwargs = deepcopy(self._config[hyperparameters_phase]["common"]["pl_trainer_kwargs"])
+                      hyperparameters_phase : Optional[str] = "hyperparameters"
+                      ):
+        trainer_kwargs = deepcopy(self._config[hyperparameters_phase]["common"]["trainer_kwargs"])
         callback_config = deepcopy(self._config[hyperparameters_phase]["common"]["callbacks"])
-        if not pl_trainer_kwargs:
-            del self._config[hyperparameters_phase]["common"]["pl_trainer_kwargs"]
+        if not trainer_kwargs:
+            del self._config[hyperparameters_phase]["common"]["trainer_kwargs"]
             return
 
-        for pl_trainer_argument, pl_trainer_value in pl_trainer_kwargs.items():
+        for pl_trainer_argument, pl_trainer_value in trainer_kwargs.items():
             if isinstance(pl_trainer_value, list):
-                pl_trainer_kwargs[pl_trainer_argument] = []
+                trainer_kwargs[pl_trainer_argument] = []
                 for callback_name in pl_trainer_value:
                     if callback_name in callback_config:
                         callback_args = callback_config[callback_name]
 
-                        if callback_name == "EarlyStopping":
-                            monitor_value = callback_args.get('monitor')
-                            if monitor_value == 'val_PortfolioReturnMetric':
-                                callback_args[
-                                    'monitor'] = monitor_value
-
-                                model_checkpoint_args = callback_config.get(
-                                    "ModelCheckPoint", {})
-                                model_checkpoint_args['monitor'] = monitor_value
-
                         if callback_name == "ModelCheckPoint":
-                            if callback_args.get(
-                                    'monitor') == 'val_PortfolioReturnMetric':
-                                callback_args['mode'] = 'max'
-                                if hyperparameters_phase == "hyperparameters" :
-                                    if current_window is not None:
-                                        callback_args['dirpath'] = f'{MODELS_PATH}/{model}/window_{current_window}'
-                                    else :
-                                        callback_args['dirpath'] = f'{MODELS_PATH}/{model}'
-                                else :
-                                    callback_args['dirpath'] = f'{MODELS_PATH}/hyperparameters_optimization/{model}'
-                                if extra_dirpath:
-                                    callback_args['dirpath'] = os.path.join(callback_args['dirpath'],extra_dirpath)
+                            callback_args['every_n_epochs'] = self._config['hyperparameters']['common']['val_check_steps']
                         callback_instance = PYTORCH_CALLBACKS[callback_name](
                             **callback_args)
-                        pl_trainer_kwargs[pl_trainer_argument].append(
+                        trainer_kwargs[pl_trainer_argument].append(
                             callback_instance)
-        return pl_trainer_kwargs
-
-    def _validate_model_metrics(self):
-        for metric in self._config["common"]["metrics_to_choose_model"]:
-            if metric not in self._models_support["supported_metrics"]:
-                raise ValueError(
-                    f"Metric {metric} is not a supported metric to"
-                    f"pick the best model"
-                )
+        return trainer_kwargs
 
     def get_model_suggest_type(self, model_name: str, model_argument_type: str = 'hyperparameters',
                        keys_only: bool = False) -> dict:
@@ -275,16 +239,41 @@ class ConfigManager:
         model_args = {}
         model_args.update(
             self._extract_config_values(model_keys.keys(), model_specific))
-        return self.assign_loss_fct(model_args,common_config)
+        model_args = self._assign_loss_fct(model_args,common_config)
+
+        if self._config['output'][0]['source'] == 'yahoo':
+            model_args['tgt_size'] = len(self._config['output'][0]['data'])
+        else:
+            raise ValueError(f'No output in config.yaml configured with Yahoo')
+        return model_args
 
     @staticmethod
-    def assign_loss_fct(model_args, common_config):
+    def _assign_loss_fct(model_args, common_config):
         likelihood = []
 
         if "likelihood" in common_config and isinstance(
                 common_config["likelihood"],
                 list):
             likelihood = common_config["likelihood"]
+
+        if "loss" in model_args and ('MQL' in model_args["loss"] or 'QL' in model_args["loss"]):
+            if likelihood:
+                model_args['loss'] = LOSS[model_args['loss']](
+                    quantiles=likelihood)
+
+            else:
+                model_args['loss'] = LOSS[model_args['loss']]()
+
+            if "confidence_level" in common_config and common_config[
+                'confidence_level'] not in likelihood:
+                raise ValueError(
+                    f'Confidence level {common_config["confidence_level"]} must be a value '
+                    f'in likelihood {likelihood}')
+
+        elif "loss" in model_args:
+            model_args['loss'] = LOSS[model_args['loss']]()
+
+        return model_args
 
 
     def _extract_config_values(self, keys : str, config : dict) -> dict:
@@ -361,9 +350,6 @@ class ConfigManager:
         sub_dict["model_data"]["train"] = os.path.join(
             MODEL_DATA_PATH, f"{data_type}_train.csv"
         )
-        sub_dict["model_data"]["predict"] = os.path.join(
-            MODEL_DATA_PATH, f"{data_type}_predict.csv"
-        )
         sub_dict["model_data"]["test"] = os.path.join(
             MODEL_DATA_PATH, f"{data_type}_test.csv"
         )
@@ -382,9 +368,6 @@ class ConfigManager:
             "engineered": {
                 "train": os.path.join(
                     ENGINEERED_PATH, f"{value}_{data_type}_train.csv"
-                ),
-                "predict": os.path.join(
-                    ENGINEERED_PATH, f"{value}_{data_type}_predict.csv"
                 ),
                 "test": os.path.join(
                     ENGINEERED_PATH, f"{value}_{data_type}_test.csv"

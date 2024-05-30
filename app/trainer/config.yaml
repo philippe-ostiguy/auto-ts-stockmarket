@@ -1,21 +1,19 @@
 common :
   start_date : '2005-07-01'
-  end_date : '2024-03-26'
+  end_date : '2024-05-23'
   max_missing_data : .02
   fetching : True
   preprocessing : True
   engineering : True
   model_phase : 'train'
-  min_nb_trades : 0
-  train_test_split : [.8,.10,.10]
-  min_validation_forecasts : 80
+  min_nb_trades : 60
+  train_test_split : [.9,.10]
+  val_proportion_size : .15
+  min_forecasts : 50
   attributes_to_discard: ["volume","split coefficient","adjusted close", "adj close"]
-  cross_validation :
-    is_running : True
-    sliding_windows: 3
   features_engineering :
     check_bell_shape: False
-    pca_variance : 1
+    pca_variance : .9
     is_using_pca : False
 
   hyperparameters_optimization :
@@ -25,8 +23,6 @@ common :
     is_using_prev_study : False
 
   scaling: False
-  metrics_to_choose_model :
-    - 'ann_return_on_risk'
 
 inputs:
   past_covariates :
@@ -34,27 +30,36 @@ inputs:
   #    data:
   #      - 'reddit'
   #    size: 100
+    - source: 'fred'
+      data:
+      # - 'set_dynamically'
+        - 'T5YIE'
+        - 'T10YIE'
+        - 'T10Y3M'
+        - 'DGS10'
+        - 'DGS2'
+        - 'DTB3'
+        - 'DEXUSNZ'
+        - 'VIXCLS'
+        - 'T10Y2Y'
+        - 'NASDAQCOM'
+        - 'DCOILWTICO'
+
     - source: 'yahoo'
       data:
-#        - 'set_dynamically_50_largest_stocks'
+        - "GC=F"
+        -  'MSFT'
+        - 'GOOGL'
+        - 'AAPL'
+        - 'AMZN'
+#          - 'set_dynamically_50_largest_stocks'
+#        - 'WTI'
 #        - 'NATURAL_GAS'
 #        - '3month'
 #        - '10year'
 #        - '2year'
-#        - 'WTI'
-#        - 'MSFT'
-        - "GC=F"
-        - "CC=F"
-#        - 'GOOGL'
-#        - 'AAPL'
-#        - 'AMZN'
-#    - source : 'fred'
-#      data:
-#        - 'set_dynamically'
-#        - 'T5YIE'
-#        - 'T10YIE'
-#        - 'DEXUSNZ'
-#        - 'VIXCLS'
+
+
   future_covariates :
       data:
         - 'day'
@@ -64,50 +69,50 @@ output :
   - source : 'yahoo'
     data :
       - 'SPY'
-      - 'AAPL'
-
 
 hyperparameters:
   common:
-    confidence_level : .6
-    batch_size: 128
-    epochs: 1
-    num_loader_workers : 2
-    random_state: 42
-    gradient_clip_val : 1
-    optimizer : "Ranger"
-
-    likelihood: [0.05,.4, 0.5,.6, 0.95]
-    max_encoder_length: 64
-    max_prediction_length: 1
+    h: 1
+    input_size: 64
+    max_steps: 500
+    val_check_steps: 1
+    batch_size: 32
+    inference_windows_batch_size: -1
+    valid_batch_size: 1000
+    learning_rate: 0.0005
+    scaler_type : 'robust'
+    #optimizer : "Ranger"
+    num_workers_loader: 2
+    random_seed: 42
+    gradient_clip_val: 1
+    #early_stop_patience_steps :
+    confidence_level: .6
+    likelihood: [ 0.05,.2, 0.5,.8, 0.95 ]
     callbacks :
       EarlyStopping :
-        monitor : 'val_PortfolioReturnMetric'
+        monitor : 'valid_loss'
         patience : 20
-        verbose : False
-        mode : 'max'
+        verbose : True
+        mode : 'min'
       ModelCheckPoint :
-        monitor : 'val_PortfolioReturnMetric'
-        mode : 'max'
-        filename : 'best_model'
+        monitor : 'valid_loss'
+        mode : 'min'
+        #filename : 'best_model'
         save_top_k : 1
         verbose : True
-    pl_trainer_kwargs :
+    trainer_kwargs :
       callbacks:
         - 'EarlyStopping'
         - 'ModelCheckPoint'
   models :
-    TemporalFusionTransformer:
-      loss: 'QuantileLoss'
-      learning_rate: 0.002
-      hidden_size: 16
-      lstm_layers : 1
-      attention_head_size: 1
+    TFT:
+      loss: 'HuberMQLoss'
+      hidden_size: 256
+      n_head: 8
       dropout: 0.1
-      hidden_continuous_size: 8
+      attn_dropout : 0.05
       #reduce_on_plateau_patience: 5
-      outputsize : 7
-      weight_decay : 0.02
+      #weight_decay : 0.02
 
 
 hyperparameters_optimization:
@@ -116,10 +121,10 @@ hyperparameters_optimization:
     epochs: 60
     gradient_clip_val : [.1,.5,1,5]
     likelihood: [0.05, 0.1, 0.3, 0.5, 0.7, 0.9, 0.95]
-    max_encoder_length: [16,32,64,128]
-    max_prediction_length: 1
+    input_size: [16,32,64,128]
+    h: 1
     batch_size: [8,16,32,64,128]
-    random_state: 42
+    random_seed: 42
     callbacks :
       EarlyStopping :
         monitor : 'val_PortfolioReturnMetric'
@@ -132,7 +137,7 @@ hyperparameters_optimization:
         save_top_k : 1
         filename : 'best_model'
         verbose : True
-    pl_trainer_kwargs :
+    trainer_kwargs :
       callbacks:
         - 'EarlyStopping'
         - 'ModelCheckPoint'

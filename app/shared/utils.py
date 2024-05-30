@@ -1,4 +1,5 @@
 import pandas_market_calendars as mcal
+import exchange_calendars
 from datetime import datetime, timedelta
 from pytz import timezone, UTC
 from functools import lru_cache
@@ -6,6 +7,8 @@ import json
 import pandas as pd
 import shutil
 import threading
+from pandas.tseries.offsets import CustomBusinessDay
+
 
 from app.shared.config.constants import (
     RAW_ATTRIBUTES,
@@ -70,6 +73,12 @@ def obtain_market_dates(start_date: str, end_date: str, market : Optional[str] =
     )
     return market_open_dates
 
+def create_custom_trading_days(start_date: str, end_date: str, market: str = "NYSE") -> CustomBusinessDay:
+    market_dates = obtain_market_dates(start_date, end_date, market)
+    trading_days = pd.DatetimeIndex(market_dates.index)
+    all_dates = pd.date_range(start=start_date, end=end_date, freq='B')
+    return CustomBusinessDay(holidays=all_dates.difference(trading_days))
+
 def add_days_to_date(original_date, days : int = 0) -> str:
     date_object = datetime.strptime(original_date, "%Y-%m-%d")
     new_date_object = date_object + timedelta(days=days)
@@ -92,17 +101,11 @@ def get_previous_market_date(date, last_market_date=None, market : Optional[str]
     return last_market_date, market_open_dates[-1].date()
 
 
-def _replace_for_sliding_window(file : str, window : Optional[int] = '') -> str:
-    if window or window ==0 :
-        file = file.replace('.csv', f'_{window}.csv')
-    return file
 
 def read_csv_to_pd_formatted(
     file: str,
-    sort_by_column_name: Optional[str] = RAW_ATTRIBUTES[0],
-        window : Optional[int] = ''
+    sort_by_column_name: Optional[str] = RAW_ATTRIBUTES[0]
 ) -> pd.DataFrame:
-    file = _replace_for_sliding_window(file, window)
 
     pd_data = pd.read_csv(file, encoding="utf-8")
     pd_data = pd_data.sort_values(by=sort_by_column_name, ascending=True)
@@ -118,11 +121,10 @@ def write_pd_to_csv(data:pd.DataFrame, file: str,
 
 def write_to_csv_formatted(
     data: pd.DataFrame, file: str, sort_by_column_name: Optional[str] = RAW_ATTRIBUTES[0],
-        window : Optional[int] = ''
-) -> None:
-    file = _replace_for_sliding_window(file, window)
 
+) -> None:
     _raise_error_if_nan_value(data)
+
     write_pd_to_csv(data,file,sort_by_column_name)
 
 
@@ -161,5 +163,5 @@ def clear_directory_content(directory_path : str, exclusions : Optional[int] = N
 
 def play_music():
     music_thread = threading.Thread(
-    target=os.system('afplay super-mario-bros.mp3'))
+        target=lambda: os.system('afplay super-mario-bros.mp3'))
     music_thread.start()

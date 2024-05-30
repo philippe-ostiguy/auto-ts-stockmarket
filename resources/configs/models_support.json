@@ -2,13 +2,5 @@
     "supported_future_inputs": [
         "day",
         "month"
-    ],
-    "supported_metrics": [
-        "rmse",
-        "predicted_vs_naive",
-        "annualized_return",
-        "predicted_vs_naive_ma",
-        "f1_score",
-        "ann_return_on_risk"
     ]
 }
