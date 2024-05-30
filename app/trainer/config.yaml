@@ -2,9 +2,9 @@ common :
   start_date : '2005-07-01'
   end_date : '2024-05-23'
   max_missing_data : .02
-  fetching : True
-  preprocessing : True
-  engineering : True
+  fetching : False
+  preprocessing : False
+  engineering : False
   model_phase : 'train'
   min_nb_trades : 60
   train_test_split : [.9,.10]
@@ -78,7 +78,7 @@ hyperparameters:
     val_check_steps: 1
     batch_size: 32
     inference_windows_batch_size: -1
-    valid_batch_size: 1000
+    valid_batch_size: 5000
     learning_rate: 0.0005
     scaler_type : 'robust'
     #optimizer : "Ranger"
@@ -87,7 +87,7 @@ hyperparameters:
     gradient_clip_val: 1
     #early_stop_patience_steps :
     confidence_level: .6
-    likelihood: [ 0.05,.2, 0.5,.8, 0.95 ]
+    likelihood: [ 0.05,.4, 0.5,.6, 0.95 ]
     callbacks :
       EarlyStopping :
         monitor : 'valid_loss'

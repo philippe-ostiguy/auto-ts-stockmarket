@@ -6,7 +6,6 @@ from app.trainer.models.common import MetricCalculation
 import logging
 from typing import Optional, Union
 import numpy as np
-import itertools
 
 
 class CustomTFT(TFT):

@@ -123,4 +123,5 @@ resources/input/*
 /resources/input/
 /app/trainer/.idea/
 .idea/
+tempo/*
 

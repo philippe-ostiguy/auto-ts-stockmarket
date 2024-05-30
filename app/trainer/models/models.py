@@ -22,6 +22,7 @@ from abc import ABC
 import torch
 from neuralforecast.models import TFT
 from neuralforecast import NeuralForecast
+import joblib
 plt.ioff()
 
 
@@ -196,18 +197,19 @@ class ModelBuilder(BaseModelBuilder):
             self._initialize_variables()
             self._model_name = model
             self._model_dir =f'models/{self._model_name}'
-            self._clean_directory()
+            #self._clean_directory()
             self._model_to_train =  CUSTOM_MODEL[self._model_name]
             self._obtain_data()
             self._assign_data_to_models()
             if self._config['common']['hyperparameters_optimization'][
                 'is_optimizing']:
                 self._assign_best_hyperparams()
-            self._train_model()
-            self._save_metrics_from_tensorboardflow()
+            #self._train_model()
+            #self._save_metrics_from_tensorboardflow()
             self._predict()
-            self._delete_event_files()
+            #self._delete_event_files()
             self._plot_predictions()
+            shutil.copyfile('app/trainer/config.yaml', os.path.join(self._model_dir,'config.yaml'))
             self._coordinate_metrics_calculation()
 
 
@@ -328,6 +330,8 @@ class ModelBuilder(BaseModelBuilder):
             mismatched_rows = self._y_hat_test[self._y_hat_test['ds'] != self._test_data['ds']]
             raise ValueError(f'The dates in the predicted vs target sets do not match in {inspect.currentframe().f_code.co_name}. Mismatched rows:\n{mismatched_rows}')
 
+        joblib.dump(self._y_hat_test, 'tempo/y_hat_test.pkl')
+
         self._all_columns_except_ds = [col for col in self._y_hat_test.columns if col not in 'ds']
         self._median_column = [col for col in self._y_hat_test.columns if '-median' in col][0]
         self._quantile_cols = [col for col in self._y_hat_test.columns if col not in [self._median_column, 'ds']]
@@ -362,7 +366,6 @@ class ModelBuilder(BaseModelBuilder):
                                              upper_index=self._upper_index)
 
         self._metrics = MetricCalculation.get_risk_rewards_metrics(daily_returns,is_checking_nb_trades=False)
-        self._metrics["nb_of_trades"] = daily_returns.shape[0]
         self._prepare_metrics_inputs()
         self._calculate_metrics()
         self._save_metrics()

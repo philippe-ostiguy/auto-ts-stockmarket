@@ -1,6 +1,7 @@
 import torch
 from app.shared.config.config_utils import ConfigManager
 from typing import Optional, Dict, Tuple
+import os
 
 class MetricCalculation:
 
@@ -15,10 +16,11 @@ class MetricCalculation:
         if config_manager is None:
             config_manager = ConfigManager(file='app/trainer/config.yaml')
         cls._metrics = {}
-        if daily_returns.shape[0] <= config_manager.config['common']['min_nb_trades'] and is_checking_nb_trades:
-            return cls._set_zero_to_metrics()
-        if daily_returns.shape[0] == 0:
-            return cls._set_zero_to_metrics()
+        cls._metrics["nb_of_trades"] = daily_returns.shape[0]
+        if cls._metrics["nb_of_trades"] <= config_manager.config['common']['min_nb_trades'] and is_checking_nb_trades:
+            return cls._set_zero_to_metrics(cls._metrics["nb_of_trades"])
+        if cls._metrics["nb_of_trades"] == 0:
+            return cls._set_zero_to_metrics(cls._metrics["nb_of_trades"])
         cls._metrics['annualized_return'] = torch.prod(1 + daily_returns) ** (
                 252.0 / daily_returns.shape[0]) - 1
         cls._metrics['annualized_risk'] = daily_returns.std() * (252 ** 0.5)
@@ -31,11 +33,12 @@ class MetricCalculation:
 
 
     @classmethod
-    def _set_zero_to_metrics(cls) -> Dict:
+    def _set_zero_to_metrics(cls, nb_of_trades) -> Dict:
         cls._metrics = {
             'annualized_return': torch.tensor(0.0),
             'annualized_risk': torch.tensor(0.0),
-            'return_on_risk': torch.tensor(0.0)
+            'return_on_risk': torch.tensor(0.0),
+            'nb_of_trades' : nb_of_trades
         }
         return cls._metrics
 
@@ -50,19 +53,27 @@ class MetricCalculation:
 
         daily_returns = torch.empty(0)
         targets_size = len(y)
+        if os.path.exists('tempo/returns.txt'):
+            os.remove('positive_returns.txt')
         for item in range(targets_size):
-            target, low_predictions,high_predictions = \
+            target, low_predictions, high_predictions = \
                 cls.convert_torch_to_list(y=y,
                                           y_hat=y_hat,
                                           item=item,
                                           lower_index=lower_index,
                                           upper_index=upper_index)
             if low_predictions > 0 and high_predictions > 0:
-                daily_returns = torch.cat((daily_returns,target),dim=0)
+                daily_returns = torch.cat((daily_returns, target), dim=0)
+                with open('tempo/returns.txt', 'a') as f:
+                    f.write(f"{target.item()}\n")
             elif high_predictions < 0 and low_predictions < 0:
-                daily_returns = torch.cat((daily_returns,-target),dim=0)
+                daily_returns = torch.cat((daily_returns, -target), dim=0)
+                with open('tempo/returns.txt', 'a') as f:
+                    f.write(f"{target.item()}\n")
 
         return daily_returns
+
+
 
 
     @staticmethod
