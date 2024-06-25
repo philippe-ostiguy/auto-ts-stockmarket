@@ -128,11 +128,11 @@ class RiskReturn(BasePointLoss):
 
         logging.warning(f'\nNb of trade in update(): {len(daily_returns)} out of {len(y)} possible')
         if daily_returns.numel()==0:
-            return torch.tensor(100.0)
+            return torch.tensor(float('inf'))
         metrics = MetricCalculation.get_risk_rewards_metrics(daily_returns)
         return_on_risk = metrics['return_on_risk']
         if return_on_risk == torch.tensor(0.0):
-            return torch.tensor(100.0)
+            return torch.tensor(float('inf'))
         logging.warning(
             f'Weighted return on risk in _get_final_val_loss : {return_on_risk}')
         return -return_on_risk

@@ -48,6 +48,49 @@ from optuna import samplers
 # import shutil
 
 
+from tensorboard.backend.event_processing import event_accumulator
+import os
+
+def _save_metrics_from_tensorboardflow():
+    metrics_dict = {}
+
+    os.makedirs(f'models/TFT/tensorboard', exist_ok=True)
+    for event_file in os.listdir('lightning_logs/version_0'):
+        if not event_file.startswith('events.out.tfevents'):
+            continue
+        full_path = os.path.join('lightning_logs/version_0', event_file)
+        ea = event_accumulator.EventAccumulator(full_path)
+        ea.Reload()
+
+        for tag in ea.Tags()['scalars']:
+            metrics_dict[tag] = ea.Scalars(tag)
+
+    for metric, scalars in metrics_dict.items():
+        plt.figure(figsize=(10, 5))
+
+        if metric == 'train_loss_step':
+            steps = [scalar.step for scalar in scalars]
+        else:
+            steps = list(range(len(scalars)))
+        if metric == 'valid_loss' or metric == 'ptl/val_loss':
+            values = [scalar.value for scalar in scalars]
+            steps, values = zip(*[(step, value) for step, value in zip(steps, values) if value <= 10])
+        else:
+            values = [scalar.value for scalar in scalars]
+
+
+        print(metric)
+        plt.plot(steps, values, label=metric)
+        plt.xlabel('Steps' if metric == 'train_loss_step' else 'Epoch')
+        plt.ylabel('Value')
+        plt.title(metric)
+        plt.legend(loc='upper right')
+        plt.savefig(f"models/TFT/tensorboard/{metric.replace('/', '_')}.png")
+        plt.close()
+_save_metrics_from_tensorboardflow()
+t = 5
+
+
 # nixtla_ckpt_name = None
 # for filename in os.listdir('lightning_logs/saved_nixtla'):
 #     if filename.endswith('.ckpt'):

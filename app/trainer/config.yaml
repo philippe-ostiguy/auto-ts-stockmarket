@@ -86,8 +86,8 @@ hyperparameters:
     random_seed: 42
     gradient_clip_val: 1
     #early_stop_patience_steps :
-    confidence_level: .6
-    likelihood: [ 0.05,.4, 0.5,.6, 0.95 ]
+    confidence_level: .5
+    likelihood: [ 0.05,.2, 0.5,.8, 0.95 ]
     callbacks :
       EarlyStopping :
         monitor : 'valid_loss'
@@ -110,7 +110,7 @@ hyperparameters:
       hidden_size: 256
       n_head: 8
       dropout: 0.1
-      attn_dropout : 0.05
+      attn_dropout : 0.1
       #reduce_on_plateau_patience: 5
       #weight_decay : 0.02
 

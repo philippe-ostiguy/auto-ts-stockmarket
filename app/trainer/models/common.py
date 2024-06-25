@@ -1,7 +1,6 @@
 import torch
 from app.shared.config.config_utils import ConfigManager
 from typing import Optional, Dict, Tuple
-import os
 
 class MetricCalculation:
 
@@ -53,8 +52,6 @@ class MetricCalculation:
 
         daily_returns = torch.empty(0)
         targets_size = len(y)
-        if os.path.exists('tempo/returns.txt'):
-            os.remove('positive_returns.txt')
         for item in range(targets_size):
             target, low_predictions, high_predictions = \
                 cls.convert_torch_to_list(y=y,
@@ -64,12 +61,8 @@ class MetricCalculation:
                                           upper_index=upper_index)
             if low_predictions > 0 and high_predictions > 0:
                 daily_returns = torch.cat((daily_returns, target), dim=0)
-                with open('tempo/returns.txt', 'a') as f:
-                    f.write(f"{target.item()}\n")
             elif high_predictions < 0 and low_predictions < 0:
                 daily_returns = torch.cat((daily_returns, -target), dim=0)
-                with open('tempo/returns.txt', 'a') as f:
-                    f.write(f"{target.item()}\n")
 
         return daily_returns
 
